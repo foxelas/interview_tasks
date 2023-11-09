@@ -1,0 +1,19 @@
+#--extra-index-url https://download.pytorch.org/whl/cu117
+#torch==1.13.1+cu117
+#torchvision==0.14.1+cu117
+#torchmetrics==0.10.3
+#boto3==1.28.63
+#botocore==1.31.63
+#efficientnet_pytorch==0.7.1
+#geopandas==0.13.0
+joblib==1.2.0
+#natsort==8.4.0
+#wandb==0.15.12
+#shapely==2.0.1
+
+seaborn
+pandas
+numpy
+notebook
+psycopg2
+sqlalchemy
