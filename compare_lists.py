@@ -16,7 +16,7 @@ def clean_value(target, brand):
     # TODO: add more extensive cleanup and make encoding also
     parts = target.split(",")
     name = parts[0]
-    name_ = name.replace("(", "").replace(")", "").replace(brand, "", 0)
+    name = name.replace("(", "").replace(")", "").replace(brand, "", 1)
     # strip brand from product name
     if len(parts) > 1:
         package = parts[-1]
@@ -24,9 +24,9 @@ def clean_value(target, brand):
         package = None
     target_delims = ['12pk', '6pk', '4pk', '12oz', '12fl', '12fz', '6 pack', '12 pack']
     for delim in target_delims:
-        if delim in name_:
-            package = delim + name_.split(delim)[1]
-            name_ = name_.split(delim)[0]
+        if delim in name:
+            package = delim + name.split(delim)[1]
+            name = name.split(delim)[0]
     return [name, package]
 
 
@@ -45,11 +45,11 @@ def compare_against(df, target, target_brand):
 
 
 def preprocess_df(df):
-    df[brand_column] = [str(x) if str(x) != "NaN" else '' for x in df[brand_column].values]
+    df = df[[brand_column, target_column]].copy()
+    df[brand_column] = [str(x).lower() if str(x) != "NaN" else '' for x in df[brand_column].values]
     zipped_vals = [clean_value(x, y) for (x,y) in zip(df[target_column], df[brand_column])]
     df[target_column] = [x[0] for x in zipped_vals]
     df["package"] = [x[1] for x in zipped_vals]
-    df[brand_column] = [x.lower() if x is not None else x for x in df[brand_column].values]
     return df
 
 
@@ -71,7 +71,7 @@ def compare_lists(input_file1, input_file2, output_file=None):
     logger.debug(f"List1:\n{df1.head()}")
     logger.debug(f"List2:\n{df2.head()}")
 
-    comp = [x for (x,y) in zip(df1[target_column], df1[brand_column]) if compare_against(df2, x, y)]
+    comp = [y + x for (x,y) in zip(df1[target_column], df1[brand_column]) if compare_against(df2, x, y)]
     comp = np.unique(comp)
 
     comp_df = pd.DataFrame({target_column: comp})
