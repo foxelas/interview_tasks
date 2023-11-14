@@ -3,7 +3,7 @@ Prediction with a NN for weather data
 
 
 # Report 
-Read the file in [prediction_with_nn_for_weather_data/report/report.pdf](https://github.com/foxelas/prediction_with_nn_for_weather_data/blob/main/report/report.pdf)
+Read the file in [report/report.pdf](report/report.pdf)
 
 
 # Requirements 
