@@ -1,0 +1,11 @@
+location_id = 116.0
+value_type_id = 11
+activation = sigmoid
+layers_number = 4
+neurons_number = [32, 16, 8, 4, 4]
+loss = mean_squared_error
+optimizer_name = SGD
+epochs = 200
+batch_size = 32
+window_size = 20
+split_percentage = 0.2
