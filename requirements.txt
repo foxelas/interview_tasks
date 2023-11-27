@@ -6,14 +6,15 @@
 #botocore==1.31.63
 #efficientnet_pytorch==0.7.1
 #geopandas==0.13.0
-joblib==1.2.0
+#joblib==1.2.0
 #natsort==8.4.0
 #wandb==0.15.12
 #shapely==2.0.1
 
-seaborn
-pandas
-numpy
-notebook
-psycopg2
-sqlalchemy
+seaborn==0.13.0
+pandas==2.1.3
+numpy==1.26.2
+notebook==7.0.6
+
+#psycopg2==2.9.9
+#sqlalchemy==2.0.23

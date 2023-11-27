@@ -1,12 +1,43 @@
-,name
-0,brooklyn brewery bel air sour
-1,brooklyn brewery lager
-2,brooklyn brewery post road pumpkin ale
-3,brooklyn brewery special effects non-alcoholic ipa
-4,budweiser zero
-5,heineken lager
-6,michelob ultra
-7,red stripe lager
-8,stella artois lager
-9,tecate beer
-10,yuengling lager
+,brand,name
+0,allagash,white beer
+1,athletic,run wild nonalcoholic ipa
+2,barrier,money ipa
+3,breckenridge,vanilla porter
+4,bronx,american pale ale
+5,bronx,now youse cant leave double ipa
+6,bronx,world gone hazy ipa
+7,brooklyn,bel air sour
+8,brooklyn,lager
+9,brooklyn,post road pumpkin ale
+10,brooklyn,pulp art hazy ipa
+11,brooklyn,special effects nonalcoholic ipa
+12,budweiser,zero
+13,corona,extra lager
+14,dogfish head,minute ipa
+15,dogfish head,seaquench ale
+16,founders,all day
+17,founders,porter
+18,half acre beer,daisy cutter pale ale
+19,heineken,alcohol free beer
+20,heineken,lager
+21,lagunitas,ipa
+22,lagunitas,little sumpin sumpin ale
+23,michelob,ultra
+24,montauk,pumpkin ale
+25,narragansett,lager
+26,peroni,lager
+27,red stripe,lager
+28,samuel adams,boston lager
+29,samuel adams,just the haze nonalcoholic ipa
+30,sapporo,premium lager
+31,sierra nevada,big little thing imperial ipa
+32,sierra nevada,little things party pack
+33,sierra nevada,pale ale
+34,sixpoint,the crisp pilz
+35,sloop,super soft ipa
+36,stella artois,lager
+37,tecate,beer
+38,torch crown,tenement pilsner
+39,victory,kick back
+40,victory,sour monkey
+41,yuengling,lager
