@@ -5,7 +5,7 @@ import os
 from collections import deque
 import mistralai
 from mistralai import Mistral
-from sokoban import Sokoban, to_ascii, solved, move
+from sokoban import Sokoban, to_, solved, move, to_ascii
 
 api_key = os.getenv("MISTRAL_API_KEY")
 if not api_key:
@@ -18,7 +18,7 @@ caption_model = "mistral-small-2506"
 text_model = "mistral-large-latest"
 vision_model = "pixtral-large-latest"
 client = Mistral(api_key=api_key)
-
+    
 class LlmPredictor:
     def __init__(self):
         self.model = text_model
@@ -63,16 +63,22 @@ class LlmPredictor:
         else:
             return content
 
-    def score_moves(self, state_ascii, action_history=None):
+    def score_moves(self, state_ascii, action_history=None, format_='ascii'):
         action_history = action_history or []
         history_text = ("No moves have been made yet." if not action_history
                         else f"Moves so far: {', '.join(action_history)}")
+
+        if format_ != 'ascii':
+            state_board = json.dumps(to_(state_ascii, format_))
+        else:
+            state_board = state_ascii
+
         prompt = (
             "Given this Sokoban board and action history, score each possible move ('up', 'down', 'left', 'right') for its promise to lead toward solving the puzzle. "
             "Assign a score between 0 (very bad move) and 1 (very promising move) to each. "
             "Respond ONLY with a JSON object like: {\"up\": 0.2, \"down\": 0.5, \"left\": 0.1, \"right\": 0.9}.\n"
             "Current board:\n"
-            f"{state_ascii}\n"
+            f"{state_board}\n"
             f"\nAction history: {history_text}\n"
         )
         response = self.ask(prompt, is_json=True, temperature=0.3)
@@ -81,19 +87,25 @@ class LlmPredictor:
                     k in {'up', 'down', 'left', 'right'}}
         return {'up': 0.25, 'down': 0.25, 'left': 0.25, 'right': 0.25}
 
-    def predict(self, state_ascii, action_history=None):
+    def predict(self, state_ascii, action_history=None, format_='ascii'):
         """
         action_history: a list of previous moves (e.g., ['up','up','left'])
         """
         action_history = action_history or []
         history_text = ("No moves have been made yet." if not action_history
                         else f"Moves so far: {', '.join(action_history)}")
+
+        if format_ != 'ascii':
+            state_board = json.dumps(to_(state_ascii, format_))
+        else:
+            state_board = state_ascii
+
         prompt = (
             f"Given this Sokoban board, which single move (up, down, left, or right) should the player take next?\n"
             f"Legend: # wall, @ player, $ box, . goal, * box on goal, + player on goal, ' ' floor\n"
             f"The goal is for the player ('@') to push all boxes ('$') onto the goal positions ('.') with the fewest moves possible, while avoiding getting stuck at a wall or corner.\n"
-            f"\nThe current board is represented in ASCII art as follows:\n"
-            f"{state_ascii}\n"
+            "Current board:\n"
+            f"{state_board}\n"
             f"\nAction history: {history_text}\n"
             f"Your response should be ONLY a JSON object with the key 'move' and the value being one of the four directions 'up', 'down', 'left', or 'right'."
         )
@@ -101,16 +113,22 @@ class LlmPredictor:
         move_ = response.get("move").lower() if isinstance(response, dict) else None
         return move_
 
-    def heuristic(self, state_ascii, action_history=None):
+    def heuristic(self, state_ascii, action_history=None, format_='ascii'):
         action_history = action_history or []
         history_text = ("No moves have been made yet." if not action_history
                         else f"Moves so far: {', '.join(action_history)}")
+
+        if format_ != 'ascii':
+            state_board = json.dumps(to_(state_ascii, format_))
+        else:
+            state_board = state_ascii
+
         prompt = (
             "Given the Sokoban board below and action history, estimate how close the board is to being solved. "
             "Return a value between 0 (solved) and 1 (very far/not solved). "
             "Respond ONLY with a JSON object: {\"score\": float}.\n"
             "Current board:\n"
-            f"{state_ascii}\n"
+            f"{state_board}\n"
             f"Action history: {history_text}\n"
         )
         response = self.ask(prompt, is_json=True, temperature=0.3)
@@ -123,7 +141,7 @@ class LlmPredictor:
                 return 0.5
         return 0.5  # Default in case of bad parse
 
-def greedy_search_with_llm(env, llm_predictor, max_steps=20):
+def greedy_search_with_llm(env, llm_predictor, max_steps=20, format_='ascii'):
     visited = set()
     state = Sokoban(to_ascii(env.board))
     moves = []
@@ -136,7 +154,7 @@ def greedy_search_with_llm(env, llm_predictor, max_steps=20):
             logger.info(f"Cycle detected at step {step}.")
             return None
         visited.add(board_str)
-        next_move = llm_predictor.predict(board_str, moves)
+        next_move = llm_predictor.predict(board_str, moves, format_=format_)
         logger.info(f"Step {step}: LLM suggests '{next_move}'")
         result = move(state.board, next_move)
         if not result:
@@ -147,7 +165,7 @@ def greedy_search_with_llm(env, llm_predictor, max_steps=20):
     logger.info("Step limit exceeded.")
     return None
 
-def beam_search_with_llm(env, llm_predictor, max_depth=10, beam_width=3):
+def beam_search_with_llm(env, llm_predictor, max_depth=10, beam_width=3, format_='ascii'):
     visited = set()
     State = lambda b, m: (Sokoban('\n'.join(''.join(row) for row in b)), list(m))
     logger.info("Starting LLM-guided search...")
@@ -166,7 +184,7 @@ def beam_search_with_llm(env, llm_predictor, max_depth=10, beam_width=3):
                 continue
             visited.add(board_str)
 
-            action = llm_predictor.predict(board_str, moves)
+            action = llm_predictor.predict(board_str, moves, format_=format_)
             logger.info(f'LLM suggested action: {action}')
             if action not in ('up', 'down', 'left', 'right'):
                 failed_count += 1
@@ -180,11 +198,11 @@ def beam_search_with_llm(env, llm_predictor, max_depth=10, beam_width=3):
                 new_env.board = result
                 new_env.moves = moves + [action]
                 new_beam.append(State(new_env.board, new_env.moves))
-                logger.debug(f"New state after action: {to_ascii(new_env.board)}")
+                logger.debug(f"New state after action: {to_(new_env.board, format_)}")
         beam = deque(sorted(new_beam, key=lambda s: len(s[1]))[:beam_width])
     return None
 
-def beam_search_with_llm_scoring(env, llm_predictor, max_depth=10, beam_width=3, top_k_moves=2):
+def beam_search_with_llm_scoring(env, llm_predictor, max_depth=10, beam_width=3, top_k_moves=2, format_='ascii'):
     visited = set()
     llm_score_cache = {}
     State = lambda b, m: (Sokoban('\n'.join(''.join(row) for row in b)), list(m))
@@ -205,7 +223,7 @@ def beam_search_with_llm_scoring(env, llm_predictor, max_depth=10, beam_width=3,
             if state_key in llm_score_cache:
                 move_scores = llm_score_cache[state_key]
             else:
-                move_scores = llm_predictor.score_moves(board_str, moves)
+                move_scores = llm_predictor.score_moves(board_str, moves, format_=format_)
                 llm_score_cache[state_key] = move_scores
             legal_moves_scores = []
             for move_dir in ['up', 'down', 'left', 'right']:
@@ -224,7 +242,7 @@ def beam_search_with_llm_scoring(env, llm_predictor, max_depth=10, beam_width=3,
             break
     return None
 
-def a_star_with_llm(env, llm_predictor, max_steps=20):
+def a_star_with_llm(env, llm_predictor, max_steps=20, format_='ascii'):
     g_score = {}
     visited = set()
     heap = []     # Heap: (f(n), h(n), steps, board_string, moves)
@@ -254,7 +272,7 @@ def a_star_with_llm(env, llm_predictor, max_steps=20):
                 new_g = steps + 1
                 if new_board_str in g_score and new_g >= g_score[new_board_str]:
                     continue
-                new_h = llm_predictor.heuristic(new_board_str, moves + [move_dir])
+                new_h = llm_predictor.heuristic(new_board_str, moves + [move_dir], format_=format_)
                 logger.info(f"Step {steps}: LLM suggests '{move_dir} with score {new_h}'")
                 new_f = new_g + new_h
                 g_score[new_board_str] = new_g
@@ -281,7 +299,7 @@ def load_microban(filename, N=1):
     return boards[:N]
 
 
-def evaluate(func, llm_predict, N=1, microban_path='microban.txt'):
+def evaluate(func, llm_predict, N=1, microban_path='microban.txt', format_='ascii'):
     puzzles = load_microban(microban_path, N)
     results = []
     for idx, ascii_board in enumerate(puzzles):
@@ -289,7 +307,7 @@ def evaluate(func, llm_predict, N=1, microban_path='microban.txt'):
         print(ascii_board)
         print("-------------------")
         env = Sokoban(ascii_board)
-        solution = func(env, llm_predict)
+        solution = func(env, llm_predict, format_=format_)
         solved = solution is not None
         print(f"Puzzle {idx+1}: {'Solved' if solved else 'Failed'} Steps: {len(solution) if solution else 'N/A'}")
         results.append({"solved": solved, "steps": len(solution) if solved else None})
@@ -299,7 +317,13 @@ def evaluate(func, llm_predict, N=1, microban_path='microban.txt'):
 if __name__ == "__main__":
     predictor = LlmPredictor()
     N = 1
-    evaluate(greedy_search_with_llm, predictor, N)
-    evaluate(beam_search_with_llm, predictor, N)
-    evaluate(beam_search_with_llm_scoring, predictor, N)
-    evaluate(a_star_with_llm, predictor, N)
+    for board_mode in [ 'structured', 'ascii']:
+        print(f'Evaluating Sokoban solving with board mode: {board_mode}')
+        print("\n\n[Baseline] Evaluating Greedy Search with LLM:")
+        evaluate(greedy_search_with_llm, predictor, N, format_=board_mode)
+        print("\n\n[Beam Search] Evaluating Beam Search with LLM:")
+        evaluate(beam_search_with_llm, predictor, N, format_=board_mode)
+        print("\n\n[Beam Search] Evaluating Beam Search with LLM Scoring:")
+        evaluate(beam_search_with_llm_scoring, predictor, N, format_=board_mode)
+        print("\n\n[A* Search] Evaluating A* Search with LLM:")
+        evaluate(a_star_with_llm, predictor, N, format_=board_mode)

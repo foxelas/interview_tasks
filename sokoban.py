@@ -19,6 +19,43 @@ def clone_board(board):
 def to_ascii(board):
     return '\n'.join(''.join(row) for row in board)
 
+def to_structured(board):
+    player = None
+    boxes = []
+    goals = []
+    walls = []
+    for y, row in enumerate(board):
+        for x, cell in enumerate(row):
+            if cell == '#':
+                walls.append([x, y])
+            elif cell == '@':
+                player = [x, y]
+            elif cell == '+':
+                player = [x, y]
+                goals.append([x, y])
+            elif cell == '$':
+                boxes.append([x, y])
+            elif cell == '*':
+                boxes.append([x, y])
+                goals.append([x, y])
+            elif cell == '.':
+                goals.append([x, y])
+            # else: floor (space), do nothing
+    return {
+        "player": player,
+        "boxes": boxes,
+        "goals": goals,
+        "walls": walls
+    }
+
+
+def to_(board, format_):
+    if format_ == 'ascii':
+        return to_ascii(board)
+    elif format_ == 'structured':
+        return to_structured(board)
+    raise ValueError(f'Unknown format: {format_}')
+
 def solved(board):
     for row in board:
         for cell in row:
@@ -55,6 +92,7 @@ def move(board, action):
         return new_board
 
     return None  # hit wall
+
 
 class Sokoban:
     def __init__(self, ascii_board):
