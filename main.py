@@ -123,7 +123,31 @@ class LlmPredictor:
                 return 0.5
         return 0.5  # Default in case of bad parse
 
-def beam_search_with_llm(env, llm_predictor, max_depth=50, beam_width=3):
+def greedy_search_with_llm(env, llm_predictor, max_steps=20):
+    visited = set()
+    state = Sokoban(to_ascii(env.board))
+    moves = []
+    for step in range(max_steps):
+        board_str = to_ascii(state.board)
+        if solved(state.board):
+            logger.info(f"Solved in {len(moves)} moves! Moves: {moves}")
+            return moves
+        if board_str in visited:
+            logger.info(f"Cycle detected at step {step}.")
+            return None
+        visited.add(board_str)
+        next_move = llm_predictor.predict(board_str, moves)
+        logger.info(f"Step {step}: LLM suggests '{next_move}'")
+        result = move(state.board, next_move)
+        if not result:
+            logger.info(f"Move '{next_move}' not possible.")
+            return None
+        state = Sokoban(to_ascii(result))
+        moves.append(next_move)
+    logger.info("Step limit exceeded.")
+    return None
+
+def beam_search_with_llm(env, llm_predictor, max_depth=10, beam_width=3):
     visited = set()
     State = lambda b, m: (Sokoban('\n'.join(''.join(row) for row in b)), list(m))
     logger.info("Starting LLM-guided search...")
@@ -158,44 +182,52 @@ def beam_search_with_llm(env, llm_predictor, max_depth=50, beam_width=3):
                 new_beam.append(State(new_env.board, new_env.moves))
                 logger.debug(f"New state after action: {to_ascii(new_env.board)}")
         beam = deque(sorted(new_beam, key=lambda s: len(s[1]))[:beam_width])
-    return None  # failed
+    return None
 
-def beam_search_with_llm_scoring(env, llm_predictor, max_depth=50, beam_width=3):
+def beam_search_with_llm_scoring(env, llm_predictor, max_depth=10, beam_width=3, top_k_moves=2):
     visited = set()
+    llm_score_cache = {}
     State = lambda b, m: (Sokoban('\n'.join(''.join(row) for row in b)), list(m))
     logger.info("Starting LLM-guided search...")
 
     beam = deque([State(env.board, env.moves)])
     for depth in range(max_depth):
-        logger.info(f"Depth {depth}, Beam size: {len(beam)}")
         candidates = []
         for state, moves in beam:
             board_str = to_ascii(state.board)
+            state_key = (board_str, tuple(moves))
             if solved(state.board):
                 logger.info(f"Solved in {len(moves)} moves: {moves}")
                 return moves
-            state_key = (board_str, tuple(moves))
             if state_key in visited:
                 continue
             visited.add(state_key)
-
-            move_scores = llm_predictor.score_moves(board_str, moves)
-            logger.info(f"LLM move scores: {move_scores}")
+            if state_key in llm_score_cache:
+                move_scores = llm_score_cache[state_key]
+            else:
+                move_scores = llm_predictor.score_moves(board_str, moves)
+                llm_score_cache[state_key] = move_scores
+            legal_moves_scores = []
             for move_dir in ['up', 'down', 'left', 'right']:
                 result = move(state.board, move_dir)
                 if result:
-                    new_env = Sokoban(to_ascii(result))
-                    new_env.moves = moves + [move_dir]
-                    candidates.append( (move_scores.get(move_dir, 0), new_env.board, new_env.moves))
-        candidates.sort(reverse=True, key=lambda x:x[0])
+                    legal_moves_scores.append((move_dir, move_scores.get(move_dir, 0)))
+            for move_dir, score in sorted(legal_moves_scores, key=lambda x: -x[1])[:top_k_moves]:
+                logger.info(f"Step {depth}: LLM suggests '{move_dir} with score {score}'")
+                result = move(state.board, move_dir)
+                new_env = Sokoban(to_ascii(result))
+                new_env.moves = moves + [move_dir]
+                candidates.append((score, new_env.board, new_env.moves))
+        candidates.sort(reverse=True, key=lambda x: x[0])
         beam = deque([State(board, moves) for (_, board, moves) in candidates[:beam_width]])
-    return None  # failed
+        if not beam:
+            break
+    return None
 
 def a_star_with_llm(env, llm_predictor, max_steps=20):
     g_score = {}
     visited = set()
-    # Heap: (f(n), h(n), steps, board_string, moves)
-    heap = []
+    heap = []     # Heap: (f(n), h(n), steps, board_string, moves)
     state = env
     moves = []
     board_str = to_ascii(state.board)
@@ -223,6 +255,7 @@ def a_star_with_llm(env, llm_predictor, max_steps=20):
                 if new_board_str in g_score and new_g >= g_score[new_board_str]:
                     continue
                 new_h = llm_predictor.heuristic(new_board_str, moves + [move_dir])
+                logger.info(f"Step {steps}: LLM suggests '{move_dir} with score {new_h}'")
                 new_f = new_g + new_h
                 g_score[new_board_str] = new_g
                 heapq.heappush(heap, (new_f, new_h, new_g, new_board_str, moves + [move_dir]))
@@ -266,6 +299,7 @@ def evaluate(func, llm_predict, N=1, microban_path='microban.txt'):
 if __name__ == "__main__":
     predictor = LlmPredictor()
     N = 1
+    evaluate(greedy_search_with_llm, predictor, N)
     evaluate(beam_search_with_llm, predictor, N)
     evaluate(beam_search_with_llm_scoring, predictor, N)
     evaluate(a_star_with_llm, predictor, N)
