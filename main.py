@@ -18,7 +18,6 @@ text_model = "mistral-large-latest"
 vision_model = "pixtral-large-latest"
 client = Mistral(api_key=api_key)
 
-
 class LlmPredictor:
     def __init__(self):
         self.model = text_model
@@ -30,6 +29,10 @@ class LlmPredictor:
         else:
             history += ([{"role": "system", "content": system}] +
                         [{"role": "user", "content": message}])
+        logger.info(f'Message sent to LLM: {message}')
+        logger.debug('Full conversation history:')
+        for msg in history:
+            logger.debug(f"{msg['role']}: {msg['content']}")
 
         try:
             args = {
@@ -43,7 +46,6 @@ class LlmPredictor:
 
             response = client.chat.complete(**args)
             content = response.choices[0].message.content
-        # TODO: hotfix for mistral SDK error handling
         except mistralai.models.sdkerror.SDKError as e:
             import os
             key = os.getenv("MISTRAL_API_KEY")[:8] + "***"
@@ -60,16 +62,25 @@ class LlmPredictor:
         else:
             return content
 
-    def predict(self, state_ascii):
-        prompt = (f"Given this Sokoban board, which single move (up, down, left, or right) should the player take next?"
-                  f"Legend: # wall, @ player, $ box, . goal, * box on goal, + player on goal, ' ' floor"
-                  f" The goal is for the player ('@') to push all boxes ('$') onto the goal positions ('.') with the fewest moves possible, while avoiding getting stuck at a wall or corner."
-                  f"\nThe current board is represented in ASCII art as follows:\n"
-                  f"\n{state_ascii}\n"
-                  f"Your response should be ONLY a JSON object with the key 'move' and the value being one of the four directions 'up', 'down', 'left', or 'right'.")
+    def predict(self, state_ascii, action_history=None):
+        """
+        action_history: a list of previous moves (e.g., ['up','up','left'])
+        """
+        action_history = action_history or []
+        history_text = ("No moves have been made yet." if not action_history
+                        else f"Moves so far: {', '.join(action_history)}")
+        prompt = (
+            f"Given this Sokoban board, which single move (up, down, left, or right) should the player take next?\n"
+            f"Legend: # wall, @ player, $ box, . goal, * box on goal, + player on goal, ' ' floor\n"
+            f"The goal is for the player ('@') to push all boxes ('$') onto the goal positions ('.') with the fewest moves possible, while avoiding getting stuck at a wall or corner.\n"
+            f"\nThe current board is represented in ASCII art as follows:\n"
+            f"{state_ascii}\n"
+            f"\nAction history: {history_text}\n"
+            f"Your response should be ONLY a JSON object with the key 'move' and the value being one of the four directions 'up', 'down', 'left', or 'right'."
+        )
         response = self.ask(prompt, is_json=True, temperature=0.5)
-        move = response.get("move").lower() if isinstance(response, dict) else None
-        return move
+        move_ = response.get("move").lower() if isinstance(response, dict) else None
+        return move_
 
 def search_with_llm(env, llm_predict, max_depth=50, beam_width=3):
     visited = set()
@@ -90,7 +101,7 @@ def search_with_llm(env, llm_predict, max_depth=50, beam_width=3):
                 continue
             visited.add(board_str)
 
-            action = llm_predict(board_str)
+            action = llm_predict(board_str, moves)
             logger.info(f'LLM suggested action: {action}')
             if action not in ('up', 'down', 'left', 'right'):
                 failed_count += 1
@@ -102,9 +113,9 @@ def search_with_llm(env, llm_predict, max_depth=50, beam_width=3):
             result = move(new_env.board, action)
             if result:
                 new_env.board = result
-                new_env.moves += moves + [action]
+                new_env.moves = moves + [action]
                 new_beam.append(State(new_env.board, new_env.moves))
-                logger.info(f"New state after action: {to_ascii(new_env.board)}")
+                logger.debug(f"New state after action: {to_ascii(new_env.board)}")
         beam = deque(sorted(new_beam, key=lambda s: len(s[1]))[:beam_width])
     return None  # failed
 
@@ -143,4 +154,4 @@ def evaluate(llm_predict, N=1, microban_path='microban.txt'):
 
 if __name__ == "__main__":
     predictor = LlmPredictor()
-    evaluate(predictor.predict, N=1)
+    evaluate(predictor.predict, N=5)
