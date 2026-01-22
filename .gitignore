@@ -165,4 +165,5 @@ gpu-39-venv/*
 venv/*
 # custom_models/*
 assets/pgadmin_sql_queries.txt
-setup/vars.env
+vars.env
+.DS_Store
